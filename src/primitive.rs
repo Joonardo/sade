@@ -5,6 +5,7 @@ use crate::aabb::AABB;
 use crate::material::Material;
 use crate::EPSILON;
 use std::ops::Range;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct HitRecord<'m> {
@@ -68,6 +69,17 @@ pub trait Hittable: Send + Sync {
 }
 
 impl Hittable for Box<dyn Hittable> {
+    fn hit(&self, ray: &Ray, t: Range<f32>, rng: &mut dyn FnMut() -> f32) -> Option<HitRecord> {
+        (**self).hit(ray, t, rng)
+    }
+
+    #[inline]
+    fn bounding_box(&self, exposure: Range<f32>) -> AABB {
+        (**self).bounding_box(exposure)
+    }
+}
+
+impl Hittable for Arc<dyn Hittable> {
     fn hit(&self, ray: &Ray, t: Range<f32>, rng: &mut dyn FnMut() -> f32) -> Option<HitRecord> {
         (**self).hit(ray, t, rng)
     }
@@ -173,10 +185,8 @@ pub struct ConstantMedium {
 
 impl Hittable for ConstantMedium {
     fn hit(&self, ray: &Ray, t: Range<f32>, rng: &mut dyn FnMut() -> f32) -> Option<HitRecord> {
-        let debug = rng() > 0.0001;
         let mut h1 = self.boundary.hit(ray, -f32::INFINITY..f32::INFINITY, rng)?;
         let mut h2 = self.boundary.hit(ray, h1.t + EPSILON..f32::INFINITY, rng)?;
-
 
         h1.t = h1.t.max(t.start);
         h2.t = h2.t.min(t.end);
@@ -207,12 +217,7 @@ impl Hittable for ConstantMedium {
 }
 
 impl ConstantMedium {
-    pub fn new(
-        boundary: Box<Hittable>,
-        phase_function: Material,
-        density: f32,
-        exposure: Range<f32>,
-    ) -> Self {
+    pub fn new(boundary: Box<dyn Hittable>, phase_function: Material, density: f32) -> Self {
         ConstantMedium {
             boundary,
             phase_function,
@@ -276,13 +281,10 @@ impl Hittable for Triangle {
     fn bounding_box(&self, _: Range<f32>) -> AABB {
         // Add small offset to ensure that the box has non-zero dimensions
         let offset = Vec3::from(EPSILON / 2.);
-        let mut min = self.vertices.0.min(self.vertices.1).min(self.vertices.2) - offset;
-        let mut max = self.vertices.0.max(self.vertices.1).max(self.vertices.2) + offset;
+        let min = self.vertices.0.min(self.vertices.1).min(self.vertices.2) - offset;
+        let max = self.vertices.0.max(self.vertices.1).max(self.vertices.2) + offset;
 
-        AABB {
-            min,
-            max,
-        }
+        AABB { min, max }
     }
 }
 

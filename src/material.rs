@@ -3,7 +3,6 @@ use crate::primitive::HitRecord;
 use crate::ray::Ray;
 
 use crate::texture::Texture;
-use crate::EPSILON;
 use rand::Rng;
 
 #[derive(Clone)]

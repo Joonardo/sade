@@ -92,3 +92,13 @@ impl From<Rgba<u8>> for Vec3 {
         Vec3::new(v.0[0] as f32, v.0[1] as f32, v.0[2] as f32) / 255.
     }
 }
+
+/*
+impl<T> Add<T> for T where T: ZipMap {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.zip_map(&rhs, Add::add)
+    }
+}
+*/

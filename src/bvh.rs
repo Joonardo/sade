@@ -2,7 +2,6 @@ use crate::aabb::AABB;
 use crate::math::{Axis3::*, Vec3};
 use crate::primitive::{HitRecord, Hittable};
 use crate::ray::Ray;
-use rand::Rng;
 use std::ops::Range;
 
 pub struct Bvh {

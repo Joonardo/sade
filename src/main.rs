@@ -2,23 +2,23 @@ use sade_h::bvh::Bvh;
 use sade_h::camera::Camera;
 use sade_h::image::Image;
 use sade_h::material::Material;
-use sade_h::math::{Axis3::*, Mat4, Vec3, Vec4};
+use sade_h::math::{Axis3::*, Vec3};
 use sade_h::primitive::{ConstantMedium, Hittable, LinearMove, Sphere, Transform, Triangle};
-use sade_h::texture::{checker, image, marbled, perlin_noise, perlin_turb, solid, Texture};
+use sade_h::texture::{checker, image, marbled, perlin_turb, solid, Texture};
 
 use rand::{thread_rng, Rng, SeedableRng};
 use sade_h::mesh::Mesh;
+use sade_h::preview::Preview;
+use sade_h::world::Background;
 use std::ops::Range;
+use std::sync::Arc;
 
+const SAMPLES: usize = 100;
 const ASPECT_RATIO: f32 = 3. / 2.;
-const WIDTH: usize = 400;
+const WIDTH: usize = 1200;
 const HEIGHT: usize = (WIDTH as f32 / ASPECT_RATIO) as usize;
 
-type Scene = (
-    Camera,
-    Vec<Box<dyn Hittable>>,
-    Box<dyn Fn(Vec3) -> Vec3 + Sync>,
-);
+type Scene = (Camera, Vec<Box<dyn Hittable>>, Background);
 
 #[allow(dead_code)]
 fn sphere_scene(exposure: Range<f32>) -> Scene {
@@ -439,8 +439,8 @@ fn bunny_scene(exposure: Range<f32>) -> Scene {
     let world = {
         let mut world: Vec<Box<dyn Hittable>> = vec![];
 
-        world.push(Box::new(Mesh::load(
-            "./bunny-with-normals.obj".to_string(),
+        let mut bunny = Mesh::load(
+            "./assets/bunny-with-normals.obj".to_string(),
             &Transform::stack(
                 [
                     Transform::rotate(0., -std::f32::consts::PI, 0.),
@@ -454,8 +454,9 @@ fn bunny_scene(exposure: Range<f32>) -> Scene {
                 fuzz: 0.0,
                 ior: 1.5,
             },
-            exposure.clone(),
-        )));
+        );
+
+        world.append(&mut bunny);
 
         world.push(Box::new(Sphere {
             center: Vec3::new(0., -1005., 0.),
@@ -466,8 +467,9 @@ fn bunny_scene(exposure: Range<f32>) -> Scene {
         }));
 
         world.push(Box::new(Sphere {
-            material: Material::Lambertian {
-                albedo: image("./earthmap.jpg".to_string()),
+            material: Material::Metal {
+                albedo: image("./assets/earthmap.jpg".to_string()),
+                fuzz: 0.7,
             },
             center: Vec3::new(6., 0., 0.),
             radius: 5.,
@@ -546,28 +548,27 @@ fn constant_medium_scene(exposure: Range<f32>) -> Scene {
                 albedo: Vec3::new(0.2, 0.4, 0.6),
             },
             0.5,
-            exposure.clone(),
         )));
 
+        let bunny = Mesh::load(
+            "./bunny-with-normals.obj".to_string(),
+            &Transform::stack(
+                [
+                    Transform::rotate(0., -std::f32::consts::PI, 0.),
+                    Transform::translate(Vec3::new(5., -5., -3.)),
+                    Transform::scale(Vec3::from(8.)),
+                ]
+                .iter(),
+            ),
+            Material::Empty,
+        );
+
         world.push(Box::new(ConstantMedium::new(
-            Box::new(Mesh::load(
-                "./bunny-with-normals.obj".to_string(),
-                &Transform::stack(
-                    [
-                        Transform::rotate(0., -std::f32::consts::PI, 0.),
-                        Transform::translate(Vec3::new(5., -5., -3.)),
-                        Transform::scale(Vec3::from(8.)),
-                    ]
-                    .iter(),
-                ),
-                Material::Empty,
-                exposure.clone(),
-            )),
+            Box::new(Bvh::new(bunny, exposure.clone())),
             Material::Isotropic {
                 albedo: Vec3::new(0.2, 0.4, 0.6),
             },
             0.5,
-            exposure.clone(),
         )));
 
         world
@@ -583,7 +584,71 @@ fn constant_medium_scene(exposure: Range<f32>) -> Scene {
     )
 }
 
+#[allow(dead_code)]
+fn cornell_box_scene(exposure: Range<f32>) -> Scene {
+    let camera = {
+        let x = 2.;
+        let y = 21.;
+        let lookfrom = Vec3::new(x, y, -20.);
+        let lookat = Vec3::new(x, y, 0.);
+
+        Camera::new(
+            lookfrom,
+            lookat,
+            Vec3::new(0., 1., 0.),
+            90.,
+            ASPECT_RATIO,
+            (lookat - lookfrom).len(),
+            0.01,
+            exposure.clone(),
+        )
+    };
+
+    let world = {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xAA33EBC);
+        let mat = Material::Lambertian {
+            albedo: marbled(2., &mut rng),
+        };
+
+        let world: Vec<Box<dyn Hittable>> = Mesh::load(
+            "./assets/cornell-box.obj".to_string(),
+            &Transform::stack(
+                [
+                    Transform::rotate(0., -std::f32::consts::PI, 0.),
+                    Transform::scale(Vec3::from(8.)),
+                ]
+                .iter(),
+            ),
+            mat,
+        );
+
+        world
+    };
+
+    (
+        camera,
+        world,
+        Box::new(|dir| {
+            let t = 0.5 * (dir.unit()[Y] + 1.);
+            Vec3::from(t) + (1. - t) * Vec3::new(0.5, 0.7, 1.)
+        }),
+    )
+}
+
+/* fn load_scene(path: String) -> Scene {
+    ron::from_str(&*std::fs::read_to_string(path.as_str()).expect("Couldn't load scene."))
+        .expect("Failed to deserialize scene.")
+} */
+
 fn main() {
+    eprintln!(
+        "{:?}",
+        (0..10)
+            .collect::<Vec<u32>>()
+            .chunks(4)
+            .collect::<Vec<&[u32]>>()
+    );
+
     let exposure = 0f32..1.;
 
     // let (camera, world, background) = sphere_scene(exposure.clone());
@@ -592,15 +657,17 @@ fn main() {
     // let (camera, world, background) = earth_scene(exposure.clone());
     // let (camera, world, background) = earth_lights_scene(exposure.clone());
     // let (camera, world, background) = triangle_scene(exposure.clone());
-    // let (camera, world, background) = bunny_scene(exposure.clone());
-    let (camera, world, background) = constant_medium_scene(exposure.clone());
+    let (camera, world, background) = bunny_scene(exposure.clone());
+    // let (camera, world, background) = constant_medium_scene(exposure.clone());
+    // let (camera, world, background) = cornell_box_scene(exposure.clone());
 
     // let mut rng = rand::rngs::StdRng::seed_from_u64(0xAA33EBC);
     // let image = Image::cast(WIDTH, HEIGHT, 10, &camera, &world[..], &mut rng);
 
     let world = Bvh::new(world, exposure.clone());
 
-    let image = Image::par_cast(WIDTH, HEIGHT, 50, &camera, background, world);
+    // let image = Image::par_cast(WIDTH, HEIGHT, SAMPLES, &camera, background, world);
+    // image.print_ppm();
 
-    image.print_ppm();
+    Preview::run(WIDTH, HEIGHT, Arc::new(world), camera, background);
 }

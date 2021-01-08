@@ -1,23 +1,14 @@
-use crate::aabb::AABB;
-use crate::bvh::Bvh;
 use crate::material::Material;
 use crate::math::{Vec3, Vec4};
-use crate::primitive::{HitRecord, Triangle};
+use crate::primitive::Triangle;
 use crate::primitive::{Hittable, Transform};
-use crate::ray::Ray;
-use std::ops::Range;
 
-pub struct Mesh(pub Bvh);
+pub struct Mesh;
 
 impl Mesh {
-    pub fn load(
-        path: String,
-        transform: &Transform,
-        material: Material,
-        exposure: Range<f32>,
-    ) -> Self {
-        let (models, _materials) = tobj::load_obj(&path, true)
-            .expect(format!("No obj-file \"{}\" found.", &path).as_str());
+    pub fn load(path: String, transform: &Transform, material: Material) -> Vec<Box<dyn Hittable>> {
+        let (models, _materials) =
+            tobj::load_obj(&path, true).expect(format!("Failed to open \"{}\".", &path).as_str());
 
         let mut objs: Vec<Box<dyn Hittable>> = vec![];
 
@@ -90,16 +81,6 @@ impl Mesh {
 
         eprintln!("loaded {} tris: {}", path, objs.len());
 
-        Mesh(Bvh::new(objs, exposure))
-    }
-}
-
-impl Hittable for Mesh {
-    fn hit(&self, ray: &Ray, t: Range<f32>, rng: &mut dyn FnMut() -> f32) -> Option<HitRecord> {
-        self.0.hit(ray, t, rng)
-    }
-
-    fn bounding_box(&self, exposure: Range<f32>) -> AABB {
-        self.0.bounding_box(exposure)
+        objs
     }
 }

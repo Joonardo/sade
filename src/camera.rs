@@ -13,6 +13,7 @@ pub struct Camera {
 
     exposure: Range<f32>,
 
+    #[allow(unused)]
     w: Vec3,
     u: Vec3,
     v: Vec3,

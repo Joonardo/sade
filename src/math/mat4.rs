@@ -50,20 +50,20 @@ impl Mat4 {
             return None;
         }
 
-        let A = *self;
-        let A2 = A * A;
-        let A3 = A * A2;
+        let a = *self;
+        let a2 = a * a;
+        let a3 = a * a2;
 
-        let trA = A.tr();
-        let trA2 = A2.tr();
-        let trA3 = A3.tr();
+        let tr_a = a.tr();
+        let tr_a2 = a2.tr();
+        let tr_a3 = a3.tr();
 
         Some(
             1. / det
-                * (1. / 6. * (trA * trA * trA - 3. * trA * trA2 + 2. * trA3) * Mat4::eye()
-                    - 1. / 2. * (trA * trA - trA2) * A
-                    + A2 * trA
-                    - A3),
+                * (1. / 6. * (tr_a * tr_a * tr_a - 3. * tr_a * tr_a2 + 2. * tr_a3) * Mat4::eye()
+                    - 1. / 2. * (tr_a * tr_a - tr_a2) * a
+                    + a2 * tr_a
+                    - a3),
         )
     }
 }

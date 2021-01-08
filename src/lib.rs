@@ -11,6 +11,7 @@ pub mod material;
 pub mod math;
 pub mod mesh;
 mod perlin;
+pub mod preview;
 pub mod primitive;
 pub mod ray;
 pub mod texture;
